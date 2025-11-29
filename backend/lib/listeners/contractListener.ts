@@ -62,67 +62,78 @@ async function pollEvents() {
 
     // 如果是第一次，从当前区块开始
     if (lastBlockNumber === 0) {
-      lastBlockNumber = currentBlock - 1; // 从上一个区块开始，避免遗漏
+      lastBlockNumber = currentBlock;
+      return; // 第一次不查询，只记录起始区块
     }
 
-    // 查询新的事件（查询最近 100 个区块）
-    const fromBlock = Math.max(lastBlockNumber - 100, 0);
-    const toBlock = currentBlock;
+    // 只查询新的区块（从上次查询的下一个区块开始）
+    const fromBlock = lastBlockNumber + 1;
+    let toBlock = currentBlock;
 
-    if (fromBlock <= toBlock) {
-      // 查询 FundsLocked 事件
-      const filter = contract.filters.FundsLocked();
-      const events = await contract.queryFilter(filter, fromBlock, toBlock);
+    // 如果没有新区块，跳过
+    if (fromBlock > toBlock) {
+      return;
+    }
 
-      for (const event of events) {
-        const txId = event.args[0] as string;
+    // 如果区块范围超过100，限制查询范围以避免 RPC 限制
+    if (toBlock - fromBlock > 100) {
+      console.log(`⚠️  区块范围过大 (${toBlock - fromBlock}), 限制为100个区块`);
+      toBlock = fromBlock + 100;
+      console.log(`📦 查询区块范围: ${fromBlock} - ${toBlock}`);
+    }
 
-        // 跳过已处理的事件
-        if (processedTxIds.has(txId)) {
-          continue;
-        }
+    // 查询 FundsLocked 事件
+    const filter = contract.filters.FundsLocked();
+    const events = await contract.queryFilter(filter, fromBlock, toBlock);
 
-        const user = event.args[1] as string;
-        const service = event.args[2] as string;
-        const amount = event.args[3] as bigint;
-        const timeout = event.args[4] as bigint;
+    for (const event of events) {
+      const txId = event.args[0] as string;
 
-        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('🔔 收到 FundsLocked 事件');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📝 交易 ID:', txId);
-        console.log('👤 用户地址:', user);
-        console.log('💼 服务商地址:', service);
-        console.log('💰 锁定金额:', ethers.formatEther(amount), 'MON');
-        console.log('⏰ 超时时间:', timeout.toString(), '秒');
-
-        // 获取区块时间戳作为 lockTime
-        const block = await event.getBlock();
-        const lockTime = Number(block.timestamp);
-        console.log('🕐 锁定时间:', new Date(lockTime * 1000).toISOString());
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-
-        // 验证服务商地址
-        if (service.toLowerCase() !== wallet.address.toLowerCase()) {
-          console.log('⚠️  服务商地址不匹配，跳过处理');
-          console.log('   期望:', wallet.address);
-          console.log('   实际:', service);
-          processedTxIds.add(txId); // 标记为已处理，避免重复
-          continue;
-        }
-
-        // 标记为已处理
-        processedTxIds.add(txId);
-
-        // 处理交易（不等待完成，避免阻塞轮询）
-        processTransaction(txId, user, amount, Number(timeout), lockTime).catch((error) => {
-          console.error('❌ 处理交易失败:', error);
-        });
+      // 跳过已处理的事件
+      if (processedTxIds.has(txId)) {
+        continue;
       }
 
-      // 更新最后处理的区块号
-      lastBlockNumber = toBlock;
+      const user = event.args[1] as string;
+      const service = event.args[2] as string;
+      const amount = event.args[3] as bigint;
+      const timeout = event.args[4] as bigint;
+
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔔 收到 FundsLocked 事件');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📝 交易 ID:', txId);
+      console.log('👤 用户地址:', user);
+      console.log('💼 服务商地址:', service);
+      console.log('💰 锁定金额:', ethers.formatEther(amount), 'MON');
+      console.log('⏰ 超时时间:', timeout.toString(), '秒');
+
+      // 获取区块时间戳作为 lockTime
+      const block = await event.getBlock();
+      const lockTime = Number(block.timestamp);
+      console.log('🕐 锁定时间:', new Date(lockTime * 1000).toISOString());
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+      // 验证服务商地址
+      if (service.toLowerCase() !== wallet.address.toLowerCase()) {
+        console.log('⚠️  服务商地址不匹配，跳过处理');
+        console.log('   期望:', wallet.address);
+        console.log('   实际:', service);
+        processedTxIds.add(txId); // 标记为已处理，避免重复
+        continue;
+      }
+
+      // 标记为已处理
+      processedTxIds.add(txId);
+
+      // 处理交易（不等待完成，避免阻塞轮询）
+      processTransaction(txId, user, amount, Number(timeout), lockTime).catch((error) => {
+        console.error('❌ 处理交易失败:', error);
+      });
     }
+
+    // 更新最后处理的区块号
+    lastBlockNumber = toBlock;
   } catch (error) {
     console.error('❌ 轮询事件失败:', error);
   }
