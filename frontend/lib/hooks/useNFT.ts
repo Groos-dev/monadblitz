@@ -21,8 +21,8 @@ export const useNFT = () => {
       throw new Error('请安装 MetaMask');
     }
 
-    if (!CONTRACTS.MonadFlowNFT) {
-      throw new Error('NFT 合约地址未配置');
+    if (!CONTRACTS.MonadFlowNFT || CONTRACTS.MonadFlowNFT === '') {
+      throw new Error('NFT 合约未部署。请运行: cd contracts && npx hardhat run scripts/deploy.ts --network monadTestnet');
     }
 
     const provider = new ethers.BrowserProvider(window.ethereum);
@@ -33,7 +33,17 @@ export const useNFT = () => {
   const getTokenIdByTxId = useCallback(async (txId: string): Promise<string | null> => {
     try {
       const contract = await getNFTContract();
-      const tokenId = await contract.getTokenIdByTxId(txId);
+
+      // 确保 txId 是 bytes32 格式（0x + 64 个十六进制字符）
+      let formattedTxId = txId;
+      if (!txId.startsWith('0x')) {
+        formattedTxId = '0x' + txId;
+      }
+
+      console.log('🔍 查询 NFT Token ID, txId:', formattedTxId);
+      const tokenId = await contract.getTokenIdByTxId(formattedTxId);
+      console.log('📝 查询结果 Token ID:', tokenId.toString());
+
       return tokenId.toString() === '0' ? null : tokenId.toString();
     } catch (err: any) {
       console.error('Get token ID error:', err);

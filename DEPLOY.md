@@ -66,8 +66,14 @@ npm run deploy
 ```
 ✅ MonadFlowController 部署成功!
 📍 合约地址: 0x...
+✅ MonadFlowNFT 部署成功!
+📍 合约地址: 0x...
+✅ NFT 合约已授权 Controller
+✅ Controller 已配置 NFT 合约
 ✅ 前端配置已自动更新
 ```
+
+**注意**: 最新版本会同时部署 `MonadFlowController` 和 `MonadFlowNFT` 两个合约，并自动完成相互配置。
 
 ### 3. 验证部署
 
@@ -109,20 +115,28 @@ npm run dev
 ```typescript
 export const CONTRACTS = {
   MonadFlowController: '0x...', // 部署后自动更新
+  MonadFlowNFT: '0x...', // NFT 合约地址（部署后自动更新）
 };
 ```
+
+**NFT 功能**: 当 AI 图片生成成功后，后端服务会自动调用合约铸造 NFT 给用户。前端会轮询检查 NFT 铸造状态并显示。
 
 ---
 
 ## 🎯 演示检查清单
 
-- [ ] 合约部署成功
-- [ ] 前端配置已更新
+- [ ] MonadFlowController 合约部署成功
+- [ ] MonadFlowNFT 合约部署成功
+- [ ] NFT 合约已授权给 Controller
+- [ ] 前端配置已更新（包括两个合约地址）
+- [ ] 后端服务提供商私钥已配置
 - [ ] MetaMask 连接到 Monad 测试网
 - [ ] 钱包有测试 MON
 - [ ] 前端可以正常访问
 - [ ] 可以连接钱包
 - [ ] 可以触发 TCC 流程
+- [ ] 后端服务监听到 FundsLocked 事件
+- [ ] NFT 自动铸造成功并显示在前端
 
 ---
 

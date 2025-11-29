@@ -17,8 +17,8 @@ export const MONAD_TESTNET_CHAIN_ID_HEX = '0x279F';
 
 // 合约地址配置
 export const CONTRACTS = {
-  MonadFlowController: '0x8AA865E227346122E734c7A4df5836Fd2Ab48218',
-  MonadFlowNFT: '', // 将在部署后自动更新
+  MonadFlowController: '0x386DcCcDd27870636848745394A139D44aF96403',
+  MonadFlowNFT: '0xFCdF7798E0315D02A63306F2545CB8bd67F5BaE1',
 };
 
 // 服务提供商地址配置

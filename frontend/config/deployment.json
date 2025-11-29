@@ -1,8 +1,9 @@
 {
-  "contractAddress": "0x09ac2D6b9A4373820999eF3e25D4c5BffeD39ddc",
+  "controllerAddress": "0x386DcCcDd27870636848745394A139D44aF96403",
+  "nftAddress": "0xFCdF7798E0315D02A63306F2545CB8bd67F5BaE1",
   "deployer": "0x89FC3c395F427d7f48d23c3d223072010f64B7F9",
-  "timestamp": "2025-11-29T08:27:07.969Z",
+  "timestamp": "2025-11-29T10:15:06.038Z",
   "network": "monadTestnet",
   "chainId": 10143,
-  "blockNumber": 52534631
+  "blockNumber": 52550817
 }

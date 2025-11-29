@@ -100,7 +100,19 @@ contract MonadFlowController is IMonadFlow {
     }
 
     /**
-     * @notice 确认交易 (TCC Confirm 阶段)
+     * @notice 确认交易 (TCC Confirm 阶段) - 不铸造 NFT
+     * @param txId 交易ID
+     * @param resultHash 结果哈希 (IPFS/proof)
+     */
+    function confirmTransaction(
+        bytes32 txId,
+        bytes32 resultHash
+    ) external onlyService(txId) inState(txId, TransactionState.LOCKED) {
+        _confirmTransaction(txId, resultHash, "");
+    }
+
+    /**
+     * @notice 确认交易 (TCC Confirm 阶段) - 铸造 NFT
      * @param txId 交易ID
      * @param resultHash 结果哈希 (IPFS/proof)
      * @param tokenURI NFT 元数据 URI（空字符串则不铸造 NFT）
@@ -110,6 +122,17 @@ contract MonadFlowController is IMonadFlow {
         bytes32 resultHash,
         string memory tokenURI
     ) external onlyService(txId) inState(txId, TransactionState.LOCKED) {
+        _confirmTransaction(txId, resultHash, tokenURI);
+    }
+
+    /**
+     * @notice 内部函数：确认交易
+     */
+    function _confirmTransaction(
+        bytes32 txId,
+        bytes32 resultHash,
+        string memory tokenURI
+    ) private {
         Transaction storage txn = transactions[txId];
 
         // 检查是否超时

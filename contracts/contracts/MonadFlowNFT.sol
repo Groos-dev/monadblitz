@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
 
 /**
  * @title MonadFlowNFT
@@ -12,20 +11,18 @@ import "@openzeppelin/contracts/utils/Counters.sol";
  * @dev 基于 ERC721 标准，支持 URI 存储
  */
 contract MonadFlowNFT is ERC721URIStorage, Ownable {
-    using Counters for Counters.Counter;
-    
     /// @notice Token ID 计数器
-    Counters.Counter private _tokenIds;
-    
+    uint256 private _tokenIdCounter;
+
     /// @notice MonadFlowController 合约地址（只有这个合约可以铸造）
     address public monadFlowController;
-    
+
     /// @notice Token ID 到交易 ID 的映射
     mapping(uint256 => bytes32) public tokenToTxId;
-    
+
     /// @notice 交易 ID 到 Token ID 的映射
     mapping(bytes32 => uint256) public txIdToToken;
-    
+
     /// @notice 事件: NFT 铸造
     event NFTMinted(
         uint256 indexed tokenId,
@@ -33,16 +30,16 @@ contract MonadFlowNFT is ERC721URIStorage, Ownable {
         address indexed to,
         string tokenURI
     );
-    
+
     modifier onlyMonadFlow() {
         require(msg.sender == monadFlowController, "Only MonadFlowController can mint");
         _;
     }
-    
+
     constructor(address initialOwner) ERC721("MonadFlow AI Art", "MFAI") Ownable(initialOwner) {
         // 构造函数中设置 owner
     }
-    
+
     /**
      * @notice 设置 MonadFlowController 地址
      * @param _controller MonadFlowController 合约地址
@@ -51,7 +48,7 @@ contract MonadFlowNFT is ERC721URIStorage, Ownable {
         require(_controller != address(0), "Invalid address");
         monadFlowController = _controller;
     }
-    
+
     /**
      * @notice 铸造 NFT（仅 MonadFlowController 可调用）
      * @param to 接收者地址
@@ -66,29 +63,29 @@ contract MonadFlowNFT is ERC721URIStorage, Ownable {
     ) external onlyMonadFlow returns (uint256) {
         require(to != address(0), "Cannot mint to zero address");
         require(txIdToToken[txId] == 0, "NFT already minted for this transaction");
-        
-        _tokenIds.increment();
-        uint256 tokenId = _tokenIds.current();
-        
+
+        _tokenIdCounter++;
+        uint256 tokenId = _tokenIdCounter;
+
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, tokenURI);
-        
+
         tokenToTxId[tokenId] = txId;
         txIdToToken[txId] = tokenId;
-        
+
         emit NFTMinted(tokenId, txId, to, tokenURI);
-        
+
         return tokenId;
     }
-    
+
     /**
      * @notice 获取总供应量
      * @return 总供应量
      */
     function totalSupply() external view returns (uint256) {
-        return _tokenIds.current();
+        return _tokenIdCounter;
     }
-    
+
     /**
      * @notice 根据交易 ID 获取 Token ID
      * @param txId 交易 ID
@@ -98,4 +95,3 @@ contract MonadFlowNFT is ERC721URIStorage, Ownable {
         return txIdToToken[txId];
     }
 }
-

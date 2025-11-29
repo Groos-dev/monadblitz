@@ -3,16 +3,16 @@
 /// <reference types="../types/ethereum" />
 
 import { ethers } from 'ethers';
-import { 
-  MONAD_FLOW_ABI, 
-  MONAD_TESTNET, 
+import {
+  MONAD_FLOW_ABI,
+  MONAD_TESTNET,
   MONAD_TESTNET_CHAIN_ID,
-  DEFAULT_CONTRACT_ADDRESS 
+  DEFAULT_CONTRACT_ADDRESS
 } from '../config/constants';
-import { 
-  ensureCorrectNetwork, 
+import {
+  ensureCorrectNetwork,
   isMetaMaskInstalled,
-  getWalletState 
+  getWalletState
 } from '../utils/wallet';
 import type {
   MonadFlowSDKConfig,
@@ -108,7 +108,7 @@ export class MonadFlowSDK {
     if (privateKey) {
       const wallet = new ethers.Wallet(privateKey, this.provider);
       this.signer = wallet as any;
-      this.contract = this.contract.connect(wallet);
+      this.contract = this.contract.connect(wallet) as ethers.Contract;
     }
   }
 
@@ -132,18 +132,18 @@ export class MonadFlowSDK {
         }
         await ensureCorrectNetwork();
         this.signer = await this.provider.getSigner();
-        return this.contract.connect(this.signer);
+        return this.contract.connect(this.signer) as ethers.Contract;
       }
 
       // Node.js 环境
       if (this.signer) {
-        return this.contract.connect(this.signer);
+        return this.contract.connect(this.signer) as ethers.Contract;
       }
 
       throw new Error('未提供签名器，Node.js 环境需要提供私钥');
     }
 
-    return this.contract;
+    return this.contract as ethers.Contract;
   }
 
   /**
@@ -309,13 +309,13 @@ export class MonadFlowSDK {
       // 设置事件监听器
       if (onFundsLocked) {
         contract.on('FundsLocked', (txId, user, service, amount, timeout, event) => {
-          onFundsLocked({ 
-            txId, 
-            user, 
-            service, 
-            amount: ethers.formatEther(amount), 
-            timeout, 
-            event 
+          onFundsLocked({
+            txId,
+            user,
+            service,
+            amount: ethers.formatEther(amount),
+            timeout,
+            event
           });
         });
       }
