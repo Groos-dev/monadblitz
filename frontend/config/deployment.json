@@ -1,8 +1,8 @@
 {
-  "contractAddress": "0x8AA865E227346122E734c7A4df5836Fd2Ab48218",
-  "deployer": "0xc66B6bC7955f3572748905c5Ba724021c6bfFe15",
-  "timestamp": "2025-11-29T06:53:35.190Z",
+  "contractAddress": "0x09ac2D6b9A4373820999eF3e25D4c5BffeD39ddc",
+  "deployer": "0x89FC3c395F427d7f48d23c3d223072010f64B7F9",
+  "timestamp": "2025-11-29T08:27:07.969Z",
   "network": "monadTestnet",
   "chainId": 10143,
-  "blockNumber": 52520615
+  "blockNumber": 52534631
 }

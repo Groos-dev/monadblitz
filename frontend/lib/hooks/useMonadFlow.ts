@@ -1,7 +1,7 @@
 // MonadFlow 合约交互 Hook
 import { useState, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { CONTRACTS } from '@/config/monad';
+import { CONTRACTS, MONAD_TESTNET, MONAD_TESTNET_CHAIN_ID } from '@/config/monad';
 import { MONAD_FLOW_ABI } from '@/config/contract-abi';
 import type { TCCTransaction, TCCState } from '@/types';
 
@@ -9,21 +9,131 @@ export const useMonadFlow = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 切换到 Monad Testnet 网络
+  const switchToMonadNetwork = useCallback(async (): Promise<boolean> => {
+    if (!window.ethereum) {
+      throw new Error('请安装 MetaMask');
+    }
+
+    try {
+      // 先尝试直接切换
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: MONAD_TESTNET.chainId }],
+        });
+        return true;
+      } catch (switchError: any) {
+        // 如果网络不存在，则添加网络
+        if (switchError.code === 4902 || switchError.code === -32603) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [MONAD_TESTNET],
+            });
+            return true;
+          } catch (addError: any) {
+            console.error('Failed to add network:', addError);
+            throw new Error('无法添加 Monad Testnet 网络，请手动添加');
+          }
+        } else if (switchError.code === 4001) {
+          throw new Error('用户拒绝了切换网络请求');
+        } else {
+          throw switchError;
+        }
+      }
+    } catch (err: any) {
+      console.error('Switch network error:', err);
+      throw err;
+    }
+  }, []);
+
+  // 检查并确保连接到正确的网络
+  const ensureCorrectNetwork = useCallback(async (): Promise<void> => {
+    if (!window.ethereum) {
+      throw new Error('请安装 MetaMask');
+    }
+
+    try {
+      // 使用 eth_chainId 方法获取当前链 ID（更可靠）
+      const chainIdHex = await window.ethereum.request({
+        method: 'eth_chainId',
+      }) as string;
+      const currentChainId = parseInt(chainIdHex, 16);
+
+      if (currentChainId !== MONAD_TESTNET_CHAIN_ID) {
+        console.log(`当前网络: ${currentChainId}, 需要切换到: ${MONAD_TESTNET_CHAIN_ID}`);
+        await switchToMonadNetwork();
+
+        // 等待网络切换完成
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 再次验证
+        const newChainIdHex = await window.ethereum.request({
+          method: 'eth_chainId',
+        }) as string;
+        const newChainId = parseInt(newChainIdHex, 16);
+
+        if (newChainId !== MONAD_TESTNET_CHAIN_ID) {
+          throw new Error('网络切换失败，请手动切换到 Monad Testnet');
+        }
+      }
+    } catch (err: any) {
+      console.error('Network check error:', err);
+      if (err.message) {
+        throw err;
+      }
+      throw new Error('无法验证网络连接，请确保 MetaMask 已连接到 Monad Testnet');
+    }
+  }, [switchToMonadNetwork]);
+
   // 获取合约实例
   const getContract = useCallback(async (withSigner = false) => {
     if (!window.ethereum) {
-      throw new Error('Please install MetaMask');
+      throw new Error('请安装 MetaMask');
     }
 
-    const provider = new ethers.BrowserProvider(window.ethereum);
+    try {
+      // 确保连接到正确的网络
+      await ensureCorrectNetwork();
 
-    if (withSigner) {
-      const signer = await provider.getSigner();
-      return new ethers.Contract(CONTRACTS.MonadFlowController, MONAD_FLOW_ABI, signer);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+
+      // 验证网络连接（双重检查）
+      try {
+        const network = await provider.getNetwork();
+        const chainId = Number(network.chainId);
+
+        if (chainId !== MONAD_TESTNET_CHAIN_ID) {
+          // 如果还是不对，尝试再次切换
+          await switchToMonadNetwork();
+          throw new Error(`请切换到 Monad Testnet 网络 (当前: ${chainId}, 需要: ${MONAD_TESTNET_CHAIN_ID})`);
+        }
+      } catch (networkErr: any) {
+        // 如果是网络错误，提供更友好的提示
+        if (networkErr.message?.includes('RPC') || networkErr.message?.includes('405') || networkErr.message?.includes('fetch')) {
+          throw new Error('RPC 连接失败，请检查网络连接或稍后重试');
+        }
+        throw networkErr;
+      }
+
+      if (withSigner) {
+        const signer = await provider.getSigner();
+        return new ethers.Contract(CONTRACTS.MonadFlowController, MONAD_FLOW_ABI, signer);
+      }
+
+      return new ethers.Contract(CONTRACTS.MonadFlowController, MONAD_FLOW_ABI, provider);
+    } catch (err: any) {
+      console.error('Get contract error:', err);
+
+      // 提供更友好的错误信息
+      if (err.message?.includes('405') || err.message?.includes('RPC') || err.message?.includes('fetch')) {
+        throw new Error('RPC 连接失败，请检查网络连接或稍后重试');
+      }
+
+      throw err;
     }
-
-    return new ethers.Contract(CONTRACTS.MonadFlowController, MONAD_FLOW_ABI, provider);
-  }, []);
+  }, [ensureCorrectNetwork, switchToMonadNetwork]);
 
   // 锁定资金 (Try)
   const lockFunds = useCallback(async (
@@ -66,8 +176,25 @@ export const useMonadFlow = () => {
       throw new Error('Failed to get transaction ID from event');
     } catch (err: any) {
       console.error('Lock funds error:', err);
-      setError(err.message || 'Failed to lock funds');
-      throw err;
+
+      // 更友好的错误提示
+      let errorMessage = '锁定资金失败';
+      if (err.message?.includes('user rejected') || err.code === 4001) {
+        errorMessage = '用户取消了交易';
+      } else if (err.message?.includes('insufficient funds') || err.message?.includes('余额')) {
+        errorMessage = '余额不足，请确保账户有足够的 MON';
+      } else if (err.message?.includes('network') || err.message?.includes('RPC') || err.message?.includes('405') || err.message?.includes('fetch')) {
+        errorMessage = '网络连接失败，请检查网络连接或稍后重试';
+      } else if (err.message?.includes('Monad Testnet') || err.message?.includes('切换到')) {
+        errorMessage = err.message;
+      } else if (err.message?.includes('无法验证网络连接')) {
+        errorMessage = err.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -210,5 +337,6 @@ export const useMonadFlow = () => {
     getTransaction,
     isTimeout,
     listenToEvents,
+    switchToMonadNetwork,
   };
 };

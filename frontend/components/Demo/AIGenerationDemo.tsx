@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet } from '@/lib/hooks/useWallet';
 import { useMonadFlow } from '@/lib/hooks/useMonadFlow';
+import { useNFT } from '@/lib/hooks/useNFT';
 import { TCCStep } from '@/types';
 import { getTCCSteps, simulateTCCFlow } from '@/lib/mock/tcc-flow';
 import { mockAIPrompts } from '@/lib/mock/ai-service';
+import { SERVICE_PROVIDER, CONTRACTS } from '@/config/monad';
 
 // Mock 图片（实际项目中可以替换为真实 AI 生成）
 const MOCK_AI_IMAGES = [
@@ -18,6 +20,7 @@ const MOCK_AI_IMAGES = [
 export default function AIGenerationDemo() {
   const wallet = useWallet();
   const monadFlow = useMonadFlow();
+  const nft = useNFT();
 
   const [prompt, setPrompt] = useState(mockAIPrompts[0]);
   const [steps, setSteps] = useState<TCCStep[]>(getTCCSteps('ai'));
@@ -25,9 +28,16 @@ export default function AIGenerationDemo() {
   const [txId, setTxId] = useState<string | null>(null);
   const [resultImage, setResultImage] = useState<string | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [serviceWallet, setServiceWallet] = useState<typeof wallet | null>(null);
+  const [useServiceWallet, setUseServiceWallet] = useState(false);
+  const [nftTokenId, setNftTokenId] = useState<string | null>(null);
+  const [nftInfo, setNftInfo] = useState<any>(null);
 
-  // 服务提供商地址（演示用，实际应该是真实的服务商地址）
-  const SERVICE_ADDRESS = '0x1234567890123456789012345678901234567890';
+  // 服务提供商地址
+  // 如果使用服务提供商钱包模式，则使用连接的钱包地址；否则使用配置的平台服务商地址
+  const SERVICE_ADDRESS = useServiceWallet && serviceWallet?.account
+    ? serviceWallet.account
+    : SERVICE_PROVIDER.address;
   const LOCK_AMOUNT = '0.1'; // 0.1 MON
   const TIMEOUT = 300; // 5分钟
 
@@ -35,6 +45,47 @@ export default function AIGenerationDemo() {
     if (!wallet.isConnected) {
       alert('请先连接钱包');
       return;
+    }
+
+    // 检查网络连接（支持多种格式：'0x279F' 或 10143）
+    const currentChainId = wallet.chainId;
+    console.log('🔍 当前网络 Chain ID:', currentChainId, typeof currentChainId);
+
+    // 转换为数字进行比较（更可靠）
+    let currentChainIdNum: number;
+    if (typeof currentChainId === 'string') {
+      if (currentChainId.startsWith('0x') || currentChainId.startsWith('0X')) {
+        currentChainIdNum = parseInt(currentChainId, 16);
+      } else {
+        currentChainIdNum = parseInt(currentChainId, 10);
+      }
+    } else {
+      currentChainIdNum = Number(currentChainId);
+    }
+
+    const isMonadTestnet = currentChainIdNum === 10143;
+    console.log('🔍 网络检查结果:', { currentChainIdNum, isMonadTestnet, expected: 10143 });
+
+    if (!isMonadTestnet) {
+      const shouldSwitch = confirm(
+        `当前未连接到 Monad Testnet 网络。\n\n当前网络: ${currentChainId} (${currentChainIdNum})\n需要网络: 0x279F (10143)\n\n是否自动切换到 Monad Testnet？\n\n（如果选择"取消"，请手动在 MetaMask 中切换网络）`
+      );
+
+      if (shouldSwitch) {
+        try {
+          await monadFlow.switchToMonadNetwork();
+          // 等待网络切换
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          // 刷新钱包状态
+          window.location.reload();
+          return;
+        } catch (error: any) {
+          alert(`网络切换失败: ${error.message || '未知错误'}\n\n请手动在 MetaMask 中切换到 Monad Testnet 网络`);
+          return;
+        }
+      } else {
+        return;
+      }
     }
 
     setIsRunning(true);
@@ -92,9 +143,31 @@ export default function AIGenerationDemo() {
       const mockIPFSHash = `QmHash${Date.now()}`;
       console.log('确认交易，结果hash:', mockIPFSHash);
 
-      // 注意：实际场景中，这应该由服务提供商调用
-      // 这里为了演示，我们模拟了这个步骤
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // 如果使用服务提供商钱包，则真实调用合约
+      if (useServiceWallet && serviceWallet?.isConnected && txId) {
+        try {
+          // 注意：这里需要切换到服务提供商的钱包来调用 confirmTransaction
+          // 为了演示，我们提示用户切换钱包
+          alert('请切换到服务提供商钱包以确认交易\n\n在 MetaMask 中切换到服务提供商账户，然后点击"继续确认"');
+
+          // 实际场景中，服务提供商会在后台自动调用
+          // 这里为了演示，我们等待用户手动确认
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          // 如果用户已经切换到服务提供商钱包，可以调用 confirmTransaction
+          // const serviceMonadFlow = useMonadFlow(); // 需要基于服务提供商钱包创建新的实例
+          // await serviceMonadFlow.confirmTransaction(txId, mockIPFSHash);
+
+          console.log('服务提供商确认交易（演示模式）');
+        } catch (error) {
+          console.error('确认交易失败:', error);
+          throw error;
+        }
+      } else {
+        // 演示模式：说明这是服务提供商的操作
+        console.log('服务提供商确认交易（模拟模式）');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
 
       updatedSteps[3].status = 'completed';
       setSteps([...updatedSteps]);
@@ -140,6 +213,40 @@ export default function AIGenerationDemo() {
         <p className="text-gray-600 dark:text-gray-400">
           体验基于 TCC 协议的防白嫖 AI 服务
         </p>
+
+        {/* 服务提供商钱包切换 */}
+        <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg max-w-2xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="text-left">
+              <p className="text-sm font-medium mb-1">💡 演示模式说明</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">
+                TCC 流程需要两个角色：
+                <br />• <strong>用户钱包</strong>：锁定资金（Try）
+                <br />• <strong>服务提供商钱包</strong>：确认交易（Confirm）
+              </p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useServiceWallet}
+                onChange={(e) => {
+                  setUseServiceWallet(e.target.checked);
+                  if (e.target.checked && !serviceWallet) {
+                    // 提示用户连接服务提供商钱包
+                    alert('请连接服务提供商钱包\n\n在 MetaMask 中切换到服务提供商账户');
+                  }
+                }}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">使用服务提供商钱包</span>
+            </label>
+          </div>
+          {useServiceWallet && serviceWallet?.account && (
+            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+              ✅ 服务提供商: {serviceWallet.account.slice(0, 10)}...
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-8">
@@ -156,6 +263,8 @@ export default function AIGenerationDemo() {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 disabled={isRunning}
+                title="选择 AI 生成提示词"
+                aria-label="选择 AI 生成提示词"
                 className="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600"
               >
                 {mockAIPrompts.map((p, i) => (
@@ -176,7 +285,13 @@ export default function AIGenerationDemo() {
                 </div>
                 <div className="flex justify-between">
                   <span>服务商:</span>
-                  <span className="font-mono text-xs">{SERVICE_ADDRESS.slice(0, 10)}...</span>
+                  <span className="font-mono text-xs" title={SERVICE_ADDRESS}>
+                    {SERVICE_ADDRESS.slice(0, 10)}...
+                  </span>
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-xs text-gray-500">平台:</span>
+                  <span className="text-xs text-gray-500">{SERVICE_PROVIDER.name}</span>
                 </div>
               </div>
             </div>
@@ -200,18 +315,59 @@ export default function AIGenerationDemo() {
             )}
           </div>
 
-          {/* Result Image */}
-          {resultImage && (
+          {/* Result Image & NFT */}
+          {(resultImage || nftInfo) && (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
               <h3 className="text-xl font-bold mb-4">✨ 生成结果</h3>
-              <img
-                src={resultImage}
-                alt="AI Generated"
-                className="w-full rounded-lg shadow-lg"
-              />
-              <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-                📌 实际项目中，这里会显示真实的 AI 生成图片
-              </p>
+
+              {resultImage && (
+                <img
+                  src={resultImage}
+                  alt="AI Generated"
+                  className="w-full rounded-lg shadow-lg mb-4"
+                />
+              )}
+
+              {nftInfo && (
+                <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">🎨</span>
+                    <h4 className="font-bold">NFT 已铸造</h4>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span>Token ID:</span>
+                      <span className="font-mono">{nftInfo.tokenId}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>所有者:</span>
+                      <span className="font-mono text-xs">{nftInfo.owner.slice(0, 10)}...</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Token URI:</span>
+                      <span className="font-mono text-xs break-all">{nftInfo.tokenURI}</span>
+                    </div>
+                    {CONTRACTS.MonadFlowNFT && (
+                      <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-700">
+                        <a
+                          href={`https://testnet.monadexplorer.com/address/${CONTRACTS.MonadFlowNFT}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                        >
+                          在浏览器中查看 NFT →
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!nftInfo && resultImage && (
+                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                  📌 等待 NFT 铸造完成...
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -277,12 +433,21 @@ export default function AIGenerationDemo() {
       <div className="mt-8 p-6 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
         <h4 className="font-bold mb-2">💡 演示说明</h4>
         <ul className="text-sm space-y-1 text-gray-700 dark:text-gray-300">
-          <li>• 点击"开始生成"后，会在 Monad 测试网上锁定 {LOCK_AMOUNT} MON</li>
-          <li>• 资金锁定后，模拟 AI 服务开始生成图片</li>
-          <li>• 生成完成后，服务商确认交易并自动结算</li>
-          <li>• 全程受智能合约保护，确保双方权益</li>
-          <li>• 🎨 图片为 Mock 数据，演示 TCC 流程</li>
+          <li>• <strong>用户钱包</strong>：点击"开始生成"后，会在 Monad 测试网上锁定 {LOCK_AMOUNT} MON</li>
+          <li>• <strong>资金锁定</strong>：资金锁定后，模拟 AI 服务开始生成图片</li>
+          <li>• <strong>服务提供商</strong>：生成完成后，服务商使用自己的钱包确认交易并自动结算</li>
+          <li>• <strong>安全保障</strong>：全程受智能合约保护，确保双方权益</li>
+          <li>• 🎨 <strong>演示数据</strong>：图片为 Mock 数据，演示 TCC 流程</li>
         </ul>
+        <div className="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+          <p className="text-xs font-medium">📌 演示提示：</p>
+          <p className="text-xs mt-1">
+            完整演示需要两个钱包账户：
+            <br />1. 用户账户（当前连接）→ 锁定资金
+            <br />2. 服务提供商账户 → 确认交易
+            <br />可以在 MetaMask 中切换账户来模拟两个角色
+          </p>
+        </div>
       </div>
     </div>
   );

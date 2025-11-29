@@ -1,0 +1,118 @@
+# MonadFlow Protocol - Cursor Rules
+
+## 项目概述
+MonadFlow Protocol 是基于 Monad 区块链的 TCC (Try-Confirm-Cancel) 原子化支付协议，连接链上资金与链下服务。
+
+## 技术栈
+- **智能合约**: Solidity 0.8.20 + Hardhat
+- **前端**: Next.js 14 + TypeScript + TailwindCSS
+- **区块链**: ethers.js v6 + Monad Testnet
+- **钱包**: MetaMask
+
+## 项目结构
+```
+monadblitz/
+├── contracts/          # 智能合约
+│   ├── contracts/      # Solidity 合约文件
+│   └── scripts/        # 部署脚本
+├── frontend/           # Next.js 前端应用
+│   ├── app/           # Next.js App Router
+│   ├── components/    # React 组件
+│   ├── lib/           # 工具函数和 Hooks
+│   └── config/        # 配置文件
+└── *.md               # 核心文档（README.MD, DEPLOY.md, CHECKLIST.md）
+
+## 核心文档
+- `README.MD` - 项目理论和概念
+- `DEPLOY.md` - 部署指南
+- `CHECKLIST.md` - 演示检查清单
+- `DEMO_GUIDE.md` - 演示指南
+
+## 编码规范
+
+### 智能合约
+- 使用 Solidity 0.8.20
+- 遵循 OpenZeppelin 安全实践
+- Gas 优化已启用
+- 所有公共函数必须有注释
+- 事件必须完整记录关键操作
+
+### 前端
+- 使用 TypeScript，严格模式
+- 组件使用 'use client' 指令（Next.js App Router）
+- 使用 TailwindCSS 进行样式
+- Hooks 命名：useXxx
+- 组件命名：PascalCase
+- 文件命名：PascalCase（组件）或 kebab-case（工具）
+
+### 钱包集成
+- 必须使用 MetaMask
+- 使用 `useWallet` hook 管理钱包状态
+- 自动检测和添加 Monad Testnet 网络
+- 监听账户和网络变化
+
+### 合约交互
+- 使用 `useMonadFlow` hook 进行合约交互
+- 所有交易必须有错误处理
+- 显示加载状态和错误信息
+- 使用 ethers.js v6 API
+
+## 重要约定
+
+### 不要创建
+- ❌ 中间态文档（STATUS.md, PROGRESS.md, FINAL_REPORT.md 等）
+- ❌ 重复的文档（多个快速开始指南）
+- ❌ Mock 合约（只使用真实可部署的合约）
+
+### 必须创建
+- ✅ 核心功能代码
+- ✅ 可部署的智能合约
+- ✅ 真实的前端交互
+- ✅ 必要的配置文档
+
+### 文档原则
+- 只保留必要的核心文档
+- 文档应该是有用的，不是临时状态记录
+- 从软件工程角度判断文档价值
+
+## 合约地址
+- **MonadFlowController**: `0x09ac2D6b9A4373820999eF3e25D4c5BffeD39ddc`
+- **网络**: Monad Testnet (Chain ID: 10143)
+- **RPC**: https://testnet-rpc.monad.xyz/
+- **浏览器**: https://testnet.monadexplorer.com
+
+## TCC 流程
+1. **Try**: 用户锁定资金（用户钱包授权）
+2. **Execute**: 链下服务执行（模拟）
+3. **Confirm**: 服务提供商确认（服务提供商钱包授权）
+4. **Cancel**: 超时或失败时退款
+
+## 演示要求
+- 需要两个钱包账户：用户钱包和服务提供商钱包
+- 用户钱包用于锁定资金
+- 服务提供商钱包用于确认交易
+- 可以在 MetaMask 中切换账户模拟两个角色
+
+## Git 提交
+- 使用中文提交信息
+- 提交信息应该清晰描述更改内容
+- 不要提交 `.env` 文件
+
+## 代码质量
+- 所有 TypeScript 代码必须通过类型检查
+- 修复所有 linter 错误（除了可接受的警告）
+- 确保代码可以正常运行和演示
+
+## 关键文件
+- `contracts/contracts/MonadFlowController.sol` - TCC 核心合约
+- `frontend/lib/hooks/useWallet.ts` - 钱包管理
+- `frontend/lib/hooks/useMonadFlow.ts` - 合约交互
+- `frontend/components/Demo/AIGenerationDemo.tsx` - 主要演示组件
+- `frontend/config/monad.ts` - 网络和合约配置
+
+## 开发流程
+1. 修改代码
+2. 检查类型错误和 linter
+3. 测试功能
+4. 提交更改（中文提交信息）
+5. 不要创建中间态文档

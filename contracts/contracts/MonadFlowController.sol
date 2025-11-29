@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./interfaces/IMonadFlow.sol";
+import "./MonadFlowNFT.sol";
 
 /**
  * @title MonadFlowController
@@ -11,7 +12,7 @@ import "./interfaces/IMonadFlow.sol";
  * 核心流程:
  * 1. Try: 用户调用 lockFunds 锁定资金
  * 2. Execute: 链下服务监听事件并执行
- * 3. Confirm: 服务完成后调用 confirmTransaction 结算
+ * 3. Confirm: 服务完成后调用 confirmTransaction 结算并铸造 NFT
  * 4. Cancel: 失败或超时时调用 cancelTransaction 退款
  */
 contract MonadFlowController is IMonadFlow {
@@ -29,6 +30,9 @@ contract MonadFlowController is IMonadFlow {
 
     /// @notice 合约拥有者
     address public owner;
+
+    /// @notice NFT 合约地址
+    MonadFlowNFT public nftContract;
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
@@ -99,10 +103,12 @@ contract MonadFlowController is IMonadFlow {
      * @notice 确认交易 (TCC Confirm 阶段)
      * @param txId 交易ID
      * @param resultHash 结果哈希 (IPFS/proof)
+     * @param tokenURI NFT 元数据 URI（空字符串则不铸造 NFT）
      */
     function confirmTransaction(
         bytes32 txId,
-        bytes32 resultHash
+        bytes32 resultHash,
+        string memory tokenURI
     ) external onlyService(txId) inState(txId, TransactionState.LOCKED) {
         Transaction storage txn = transactions[txId];
 
@@ -122,6 +128,15 @@ contract MonadFlowController is IMonadFlow {
 
         // 转账给服务提供商
         serviceBalances[txn.service] += serviceAmount;
+
+        // 如果提供了 tokenURI 且 NFT 合约已设置，则铸造 NFT
+        if (bytes(tokenURI).length > 0 && address(nftContract) != address(0)) {
+            try nftContract.mint(txn.user, txId, tokenURI) returns (uint256 tokenId) {
+                // NFT 铸造成功
+            } catch {
+                // NFT 铸造失败不影响交易确认
+            }
+        }
 
         emit TransactionConfirmed(txId, resultHash, block.timestamp);
     }
@@ -218,5 +233,14 @@ contract MonadFlowController is IMonadFlow {
             states[i] = transactions[txIds[i]].state;
         }
         return states;
+    }
+
+    /**
+     * @notice 设置 NFT 合约地址（仅 owner）
+     * @param _nftContract NFT 合约地址
+     */
+    function setNFTContract(address _nftContract) external onlyOwner {
+        require(_nftContract != address(0), "Invalid address");
+        nftContract = MonadFlowNFT(_nftContract);
     }
 }

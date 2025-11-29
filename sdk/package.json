@@ -1,0 +1,35 @@
+{
+  "name": "@monadblitz/sdk",
+  "version": "0.1.0",
+  "description": "MonadFlow Protocol SDK - TCC (Try-Confirm-Cancel) atomic payment protocol SDK for Monad blockchain",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "monad",
+    "blockchain",
+    "tcc",
+    "payment",
+    "sdk"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "ethers": "^6.0.0"
+  }
+}

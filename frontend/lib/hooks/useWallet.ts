@@ -11,9 +11,12 @@ export const useWallet = () => {
     isLoading: false,
   });
   const [error, setError] = useState<string | null>(null);
+  // 使用 state 存储 MetaMask 安装状态，避免 hydration 错误
+  const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState<boolean>(false);
 
-  const isMetaMaskInstalled = useCallback((): boolean => {
-    return typeof window !== 'undefined' && typeof window.ethereum !== 'undefined';
+  // 在客户端检查 MetaMask 是否安装
+  useEffect(() => {
+    setIsMetaMaskInstalled(typeof window !== 'undefined' && typeof window.ethereum !== 'undefined');
   }, []);
 
   const getBalance = useCallback(async (account: string): Promise<string> => {
@@ -23,11 +26,16 @@ export const useWallet = () => {
       const balance = await window.ethereum.request({
         method: 'eth_getBalance',
         params: [account, 'latest'],
-      });
+      }) as string;
 
       // 简单的 wei 转 ether
       const balanceInEther = parseInt(balance, 16) / 1e18;
-      return balanceInEther.toFixed(4);
+      console.log('Balance fetched:', {
+        hex: balance,
+        wei: parseInt(balance, 16),
+        ether: balanceInEther
+      });
+      return balanceInEther.toString();
     } catch (err) {
       console.error('Error getting balance:', err);
       return '0';
@@ -38,7 +46,7 @@ export const useWallet = () => {
     if (!window.ethereum) return null;
 
     try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string;
       return chainId;
     } catch (err) {
       console.error('Error getting chain ID:', err);
@@ -47,7 +55,7 @@ export const useWallet = () => {
   }, []);
 
   const connect = useCallback(async () => {
-    if (!isMetaMaskInstalled()) {
+    if (!isMetaMaskInstalled) {
       setError('MetaMask is not installed. Please install MetaMask extension.');
       return;
     }
@@ -55,10 +63,16 @@ export const useWallet = () => {
     setWalletState((prev) => ({ ...prev, isLoading: true }));
     setError(null);
 
+    if (!window.ethereum) {
+      setError('MetaMask is not installed.');
+      setWalletState((prev) => ({ ...prev, isLoading: false }));
+      return;
+    }
+
     try {
       const accounts = await window.ethereum.request({
         method: 'eth_requestAccounts',
-      });
+      }) as string[];
 
       if (accounts.length > 0) {
         const account = accounts[0];
@@ -110,10 +124,12 @@ export const useWallet = () => {
   }, [walletState.account, getBalance]);
 
   const addMonadNetwork = useCallback(async () => {
-    if (!isMetaMaskInstalled()) {
+    if (!isMetaMaskInstalled) {
       setError('MetaMask is not installed.');
       return;
     }
+
+    if (!window.ethereum) return false;
 
     try {
       await window.ethereum.request({
@@ -142,10 +158,11 @@ export const useWallet = () => {
 
   // 监听账户和网络变化
   useEffect(() => {
-    if (!isMetaMaskInstalled()) return;
+    if (!isMetaMaskInstalled) return;
 
-    const handleAccountsChanged = async (accounts: string[]) => {
-      if (accounts.length > 0) {
+    const handleAccountsChanged = async (...args: unknown[]) => {
+      const accounts = args[0] as string[];
+      if (accounts && accounts.length > 0) {
         const account = accounts[0];
         const balance = await getBalance(account);
         const chainId = await getChainId();
@@ -162,7 +179,8 @@ export const useWallet = () => {
       }
     };
 
-    const handleChainChanged = async (chainId: string) => {
+    const handleChainChanged = async (...args: unknown[]) => {
+      const chainId = args[0] as string;
       setWalletState((prev) => ({ ...prev, chainId }));
 
       if (walletState.account) {
@@ -177,11 +195,13 @@ export const useWallet = () => {
       }
     };
 
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-    window.ethereum.on('chainChanged', handleChainChanged);
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+    }
 
     return () => {
-      if (window.ethereum.removeListener) {
+      if (window.ethereum?.removeListener) {
         window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
         window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
@@ -191,14 +211,14 @@ export const useWallet = () => {
   // 检查初始连接状态
   useEffect(() => {
     const checkConnection = async () => {
-      if (!isMetaMaskInstalled()) return;
+      if (!isMetaMaskInstalled || !window.ethereum) return;
 
       try {
         const accounts = await window.ethereum.request({
           method: 'eth_accounts',
-        });
+        }) as string[];
 
-        if (accounts.length > 0) {
+        if (accounts && accounts.length > 0) {
           const account = accounts[0];
           const balance = await getBalance(account);
           const chainId = await getChainId();
@@ -226,6 +246,6 @@ export const useWallet = () => {
     disconnect,
     refreshBalance,
     addMonadNetwork,
-    isMetaMaskInstalled: isMetaMaskInstalled(),
+    isMetaMaskInstalled,
   };
 };

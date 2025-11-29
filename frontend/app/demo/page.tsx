@@ -50,8 +50,32 @@ export default function DemoPage() {
             )}
 
             {wallet.error && (
-              <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                {wallet.error}
+              <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                <div className="text-sm text-red-600 dark:text-red-400 font-medium">
+                  {wallet.error}
+                </div>
+                {wallet.error.includes('Monad Testnet') && (
+                  <button
+                    onClick={wallet.addMonadNetwork}
+                    className="mt-2 text-xs text-red-600 dark:text-red-400 underline hover:no-underline"
+                  >
+                    点击添加 Monad Testnet 网络
+                  </button>
+                )}
+              </div>
+            )}
+
+            {wallet.isConnected && wallet.chainId !== '0x279F' && (
+              <div className="mt-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                <div className="text-sm text-yellow-600 dark:text-yellow-400 font-medium mb-2">
+                  ⚠️ 请切换到 Monad Testnet 网络
+                </div>
+                <button
+                  onClick={wallet.addMonadNetwork}
+                  className="text-xs text-yellow-600 dark:text-yellow-400 underline hover:no-underline"
+                >
+                  点击切换网络
+                </button>
               </div>
             )}
           </div>
