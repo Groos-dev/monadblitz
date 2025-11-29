@@ -20,7 +20,7 @@ export default function Home() {
         {/* Core Value */}
         <div className="max-w-4xl mx-auto mb-16">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
-            <h2 className="text-3xl font-bold mb-6 text-center">解决 Web3 的"最后一公里"</h2>
+            <h2 className="text-3xl font-bold mb-6 text-center">解决 Web3 的&ldquo;最后一公里&rdquo;</h2>
 
             <div className="grid md:grid-cols-2 gap-6">
               <div className="p-6 bg-red-50 dark:bg-red-900/20 rounded-xl">
@@ -85,14 +85,30 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Demo Link */}
-        <div className="text-center mb-16">
-          <Link
-            href="/demo"
-            className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition shadow-lg hover:shadow-xl"
-          >
-            🚀 查看实时演示
-          </Link>
+        {/* Action Links */}
+        <div className="text-center mb-16 space-y-4">
+          <div>
+            <Link
+              href="/demo"
+              className="inline-block px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-lg font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 transition shadow-lg hover:shadow-xl"
+            >
+              🚀 查看实时演示
+            </Link>
+          </div>
+          <div className="flex gap-4 justify-center flex-wrap">
+            <Link
+              href="/nft-verify"
+              className="inline-block px-8 py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-lg font-bold rounded-xl hover:from-green-700 hover:to-emerald-700 transition shadow-lg hover:shadow-xl"
+            >
+              🎨 验证 NFT 铸造
+            </Link>
+            <Link
+              href="/docs"
+              className="inline-block px-8 py-4 bg-gradient-to-r from-orange-600 to-red-600 text-white text-lg font-bold rounded-xl hover:from-orange-700 hover:to-red-700 transition shadow-lg hover:shadow-xl"
+            >
+              📚 SDK 接入文档
+            </Link>
+          </div>
         </div>
 
         {/* Why Monad */}

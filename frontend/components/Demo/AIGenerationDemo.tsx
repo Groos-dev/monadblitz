@@ -32,6 +32,7 @@ export default function AIGenerationDemo() {
   const [useServiceWallet, setUseServiceWallet] = useState(false);
   const [nftTokenId, setNftTokenId] = useState<string | null>(null);
   const [nftInfo, setNftInfo] = useState<any>(null);
+  const [checkingNFT, setCheckingNFT] = useState(false);
 
   // 服务提供商地址
   // 如果使用服务提供商钱包模式，则使用连接的钱包地址；否则使用配置的平台服务商地址
@@ -40,6 +41,78 @@ export default function AIGenerationDemo() {
     : SERVICE_PROVIDER.address;
   const LOCK_AMOUNT = '0.1'; // 0.1 MON
   const TIMEOUT = 300; // 5分钟
+
+  // 轮询检查 NFT 是否已铸造
+  useEffect(() => {
+    // 检查 NFT 合约是否已部署
+    if (!CONTRACTS.MonadFlowNFT || CONTRACTS.MonadFlowNFT === '') {
+      console.log('⚠️ NFT 合约未部署，跳过 NFT 检查');
+      return;
+    }
+
+    if (!txId || nftInfo) return;
+
+    let intervalId: NodeJS.Timeout;
+    let attempts = 0;
+    const maxAttempts = 60; // 最多检查 60 次（5 分钟）
+
+    const checkNFT = async () => {
+      if (attempts >= maxAttempts) {
+        console.log('⏰ NFT 检查超时');
+        clearInterval(intervalId);
+        setCheckingNFT(false);
+        return;
+      }
+
+      attempts++;
+      console.log(`🔍 检查 NFT (${attempts}/${maxAttempts})...`);
+
+      try {
+        const tokenId = await nft.getTokenIdByTxId(txId);
+        if (tokenId) {
+          console.log('✅ 找到 NFT Token ID:', tokenId);
+          setNftTokenId(tokenId);
+
+          const info = await nft.getNFTInfo(tokenId);
+          if (info) {
+            console.log('✅ NFT 信息:', info);
+            setNftInfo(info);
+            clearInterval(intervalId);
+            setCheckingNFT(false);
+
+            // 更新步骤 4（Complete）为已完成
+            setSteps(prevSteps => {
+              const updatedSteps = [...prevSteps];
+              if (updatedSteps[4]) {
+                updatedSteps[4].status = 'completed';
+              }
+              return updatedSteps;
+            });
+          }
+        }
+      } catch (error: any) {
+        console.error('检查 NFT 失败:', error);
+        // 如果是 NFT 合约未部署的错误，停止检查
+        if (error.message && error.message.includes('NFT 合约未部署')) {
+          console.log('⚠️ NFT 合约未部署，停止检查');
+          clearInterval(intervalId);
+          setCheckingNFT(false);
+        }
+      }
+    };
+
+    // 立即检查一次
+    setCheckingNFT(true);
+    checkNFT();
+
+    // 每 5 秒检查一次
+    intervalId = setInterval(checkNFT, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      setCheckingNFT(false);
+    };
+  }, [txId, nftInfo, nft]);
 
   const handleStartDemo = async () => {
     if (!wallet.isConnected) {
@@ -204,6 +277,9 @@ export default function AIGenerationDemo() {
     setTxId(null);
     setResultImage(null);
     setIsRunning(false);
+    setNftTokenId(null);
+    setNftInfo(null);
+    setCheckingNFT(false);
   };
 
   return (
@@ -328,34 +404,66 @@ export default function AIGenerationDemo() {
                 />
               )}
 
-              {nftInfo && (
-                <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              {/* NFT 铸造状态 */}
+              {checkingNFT && !nftInfo && (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-2xl">🎨</span>
-                    <h4 className="font-bold">NFT 已铸造</h4>
+                    <div className="animate-spin">⏳</div>
+                    <h4 className="font-bold">正在铸造 NFT...</h4>
                   </div>
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span>Token ID:</span>
-                      <span className="font-mono">{nftInfo.tokenId}</span>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    后端服务正在确认交易并铸造 NFT，请稍候...
+                  </p>
+                </div>
+              )}
+
+              {nftInfo && (
+                <div className="mt-4 p-6 bg-gradient-to-br from-green-50 via-purple-50 to-pink-50 dark:from-green-900/20 dark:via-purple-900/20 dark:to-pink-900/20 rounded-xl border-2 border-green-400 dark:border-green-600 shadow-lg">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <span className="text-4xl animate-bounce">🎉</span>
+                    <h4 className="text-xl font-bold text-green-700 dark:text-green-300">NFT 铸造成功！</h4>
+                    <span className="text-4xl animate-bounce">✨</span>
+                  </div>
+
+                  <div className="text-center mb-4 p-3 bg-white dark:bg-gray-800 rounded-lg">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">您的 AI 艺术作品已永久上链</div>
+                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      Token #{nftInfo.tokenId}
                     </div>
-                    <div className="flex justify-between">
-                      <span>所有者:</span>
-                      <span className="font-mono text-xs">{nftInfo.owner.slice(0, 10)}...</span>
+                  </div>
+
+                  <div className="text-sm space-y-2">
+                    <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-600 dark:text-gray-400">所有者:</span>
+                        <span className="font-mono text-xs font-semibold" title={nftInfo.owner}>
+                          {nftInfo.owner.slice(0, 6)}...{nftInfo.owner.slice(-4)}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Token URI:</span>
-                      <span className="font-mono text-xs break-all">{nftInfo.tokenURI}</span>
+                    <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
+                      <div className="text-gray-600 dark:text-gray-400 mb-2 text-center">Token URI:</div>
+                      <div className="font-mono text-xs break-all text-purple-600 dark:text-purple-400 text-center">
+                        {nftInfo.tokenURI}
+                      </div>
                     </div>
                     {CONTRACTS.MonadFlowNFT && (
-                      <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-700">
+                      <div className="pt-3 space-y-2">
                         <a
                           href={`https://testnet.monadexplorer.com/address/${CONTRACTS.MonadFlowNFT}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                          className="block text-center py-2 px-4 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition font-medium"
                         >
-                          在浏览器中查看 NFT →
+                          🔗 在区块链浏览器中查看 NFT
+                        </a>
+                        <a
+                          href="/nft-verify"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-center py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg transition font-medium"
+                        >
+                          🔍 验证 NFT 详情
                         </a>
                       </div>
                     )}
@@ -363,10 +471,31 @@ export default function AIGenerationDemo() {
                 </div>
               )}
 
-              {!nftInfo && resultImage && (
-                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
-                  📌 等待 NFT 铸造完成...
-                </p>
+              {!nftInfo && !checkingNFT && resultImage && (
+                <>
+                  {!CONTRACTS.MonadFlowNFT || CONTRACTS.MonadFlowNFT === '' ? (
+                    <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xl">⚠️</span>
+                        <div className="flex-1">
+                          <h4 className="font-bold text-yellow-800 dark:text-yellow-200 mb-1">
+                            NFT 合约未部署
+                          </h4>
+                          <p className="text-xs text-yellow-700 dark:text-yellow-300 mb-2">
+                            当前部署的合约版本不支持 NFT 铸造功能。
+                          </p>
+                          <p className="text-xs text-yellow-700 dark:text-yellow-300 font-mono bg-yellow-100 dark:bg-yellow-900/30 p-2 rounded">
+                            cd contracts && npx hardhat run scripts/deploy.ts --network monadTestnet
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-gray-600 dark:text-gray-400 text-center">
+                      📌 等待后端确认交易并铸造 NFT...
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}
